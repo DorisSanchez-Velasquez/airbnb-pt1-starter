@@ -4,6 +4,18 @@ const security = require("../middleware/security")
 const permissions = require("../middleware/permissions")
 const router = express.Router()
 
+router.post("/listings/:listingId", security.requireAuthenticatedUser, permissions.authedUserIsNotListingOwner, async(req,res,next) => {
+    try{
+        const {user} = res.locals
+        const {listing} = res.locals
+        const {newBooking} = req.body.newBooking
+        const booking = await Booking.newBooking({newBooking, listing, user})
+        return res.status(201).json({booking})
+    } catch( error ) {
+        next(error)
+    }
+})
+
 router.get("/", security.requireAuthenticatedUser, async (req, res, next) => {
   try {
     // list all bookings created by authenticated user
@@ -41,5 +53,6 @@ router.get(
     }
   }
 )
+
 
 module.exports = router

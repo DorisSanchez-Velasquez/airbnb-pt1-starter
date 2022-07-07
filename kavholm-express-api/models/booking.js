@@ -114,6 +114,64 @@ class Booking {
 
     return results.rows
   }
+
+
+
+  static async newBooking({newBooking, listing, user})
+  {
+      const requiredFields = ["startDate", "endDate"]
+      requiredFields.forEach((field) => {
+        if (!newBooking?.hasOwnProperty(field)) {
+          throw new BadRequestError(`Missing required field - ${field} - in request body.`)
+        }
+      })
+
+      const results = await db.query(
+          `
+              INSERT INTO bookings(
+                payment_method,
+                start_date,
+                end_date,
+                guests,
+                total_cost,
+                listing_id,
+                user_id
+              )
+              VALUES ($1, 
+                      ($2) :: date, 
+                      ($3) :: date, 
+                      $4, 
+                      CEIL( ((($3)::date - ($2)::date) + 1) * ($5 * 1.1) ), 
+                      $6, 
+                      (SELECT id FROM users WHERE username= $7))
+
+              RETURNING id,
+                        payment_method AS "paymentMethod",
+                        start_date AS "startDate",
+                        end_date AS "endDate",
+                        guests,
+                        total_cost::Integer AS "totalCost",
+                        listing_id AS "listingId",
+                        user_id AS "userId",
+                        (SELECT username FROM users WHERE id = user_id) AS "username",
+                        (SELECT users.username FROM users
+                         WHERE users.id = (
+                            SELECT listings.user_id
+                            FROM listings
+                            WHERE listings.id = listing_id
+                         )) AS "hostUsername",
+                        created_at AS "createdAt";
+
+          `, [newBooking.paymentMethod || "card",
+              newBooking.startDate,
+              newBooking.endDate,
+              newBooking.guests || 1,
+              listing.price,
+              listing.id,
+              user.username]
+      )
+      return results.rows[0]
+  }
 }
 
 module.exports = Booking
